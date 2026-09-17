@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rabat Transit 3D - Real-time Transit Visualization</title>
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            overflow: hidden;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .control-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+            z-index: 1000;
+            min-width: 280px;
+            max-width: 320px;
+        }
+
+        .control-panel h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #1a1a2e;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .control-panel h1 .logo {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #e91e63, #9c27b0);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .subtitle {
+            font-size: 0.75rem;
+            color: #666;
+            margin-bottom: 16px;
+        }
+
+        .time-display {
+            background: linear-gradient(135deg, #1a1a2e, #2d2d44);
+            color: white;
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+
+        .time-display .time {
+            font-size: 2.5rem;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: -1px;
+        }
+
+        .time-display .date {
+            font-size: 0.85rem;
+            opacity: 0.8;
+            margin-top: 4px;
+        }
+
+        .time-slider {
+            width: 100%;
+            margin: 12px 0;
+            -webkit-appearance: none;
+            height: 6px;
+            border-radius: 3px;
+            background: linear-gradient(90deg, #e91e63, #9c27b0);
+            outline: none;
+        }
+
+        .time-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            border: 2px solid #e91e63;
+        }
+
+        .play-controls {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .play-controls button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .btn-play {
+            background: linear-gradient(135deg, #e91e63, #9c27b0);
+            color: white;
+        }
+
+        .btn-play:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(233, 30, 99, 0.4);
+        }
+
+        .btn-reset {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-reset:hover {
+            background: #e0e0e0;
+        }
+
+        .speed-control {
+            margin-bottom: 16px;
+        }
+
+        .speed-control label {
+            font-size: 0.75rem;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .speed-buttons {
+            display: flex;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .speed-buttons button {
+            flex: 1;
+            padding: 8px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+        }
+
+        .speed-buttons button.active {
+            border-color: #e91e63;
+            background: rgba(233, 30, 99, 0.1);
+            color: #e91e63;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .stat-box {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-box .value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1a1a2e;
+        }
+
+        .stat-box .label {
+            font-size: 0.7rem;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-box.tram .value { color: #e91e63; }
+        .stat-box.bus .value { color: #2196f3; }
+        .stat-box.train .value { color: #ff9800; }
+
+        .route-legend {
+            border-top: 1px solid #eee;
+            padding-top: 16px;
+        }
+
+        .route-legend h3 {
+            font-size: 0.75rem;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+        }
+
+        .legend-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.8rem;
+            padding: 4px 10px;
+            background: #f8f9fa;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .legend-item:hover {
+            background: #e8e8e8;
+        }
+
+        .legend-item.active {
+            background: rgba(233, 30, 99, 0.1);
+        }
+
+        .view-controls {
+            border-top: 1px solid #eee;
+            padding-top: 16px;
+            margin-top: 16px;
+        }
+
+        .view-controls h3 {
+            font-size: 0.75rem;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+        }
+
+        .view-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .view-buttons button {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .view-buttons button.active {
+            border-color: #e91e63;
+            background: rgba(233, 30, 99, 0.1);
+            color: #e91e63;
+        }
+
+        .view-buttons button:hover:not(.active) {
+            background: #f5f5f5;
+        }
+
+        .legend-item .color {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, #1a1a2e, #2d2d44);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.5s, visibility 0.5s;
+        }
+
+        .loading-overlay.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(255,255,255,0.2);
+            border-top-color: #e91e63;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.8; }
+        }
+
+        .mapboxgl-canvas {
+            cursor: grab;
+        }
+
+        .mapboxgl-canvas:active {
+            cursor: grabbing;
+        }
+
+        .loading-text {
+            color: white;
+            margin-top: 20px;
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        .loading-subtext {
+            color: rgba(255,255,255,0.6);
+            margin-top: 8px;
+            font-size: 0.85rem;
+        }
+
+        .info-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 12px 16px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+            z-index: 1000;
+            font-size: 0.8rem;
+            color: #666;
+        }
+
+        .info-panel a {
+            color: #e91e63;
+            text-decoration: none;
+        }
+
+        .vehicle-popup {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .vehicle-popup h4 {
+            margin: 0 0 8px 0;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .vehicle-popup .route-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        .vehicle-popup p {
+            margin: 4px 0;
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        .mapboxgl-popup-content {
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        }
+
+        .mapboxgl-popup-close-button {
+            font-size: 20px;
+            padding: 4px 8px;
+        }
+
+        @media (max-width: 768px) {
+            .control-panel {
+                top: auto;
+                bottom: 20px;
+                left: 10px;
+                right: 10px;
+                max-width: none;
+                max-height: 50vh;
+                overflow-y: auto;
+            }
+
+            .info-panel {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-overlay" id="loading">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Loading Rabat Transit 3D</div>
+        <div class="loading-subtext">Fetching routes and schedules...</div>
+    </div>
+
+    <div id="map"></div>
+
+    <div class="control-panel">
+        <h1>
+            <span class="logo">R</span>
+            Rabat Transit 3D
+        </h1>
+        <p class="subtitle">Real-time transit visualization • Rabat-Salé-Témara</p>
+
+        <div class="time-display">
+            <div class="time" id="currentTime">00:00:00</div>
+            <div class="date" id="currentDate">Loading...</div>
+        </div>
+
+        <input type="range" class="time-slider" id="timeSlider" min="0" max="86400" value="32400" step="60">
+
+        <div class="play-controls">
+            <button class="btn-play" id="playBtn">▶ Play</button>
+            <button class="btn-reset" id="resetBtn">↺ Now</button>
+        </div>
+
+        <div class="speed-control">
+            <label>Simulation Speed</label>
+            <div class="speed-buttons">
+                <button data-speed="1" class="active">1×</button>
+                <button data-speed="10">10×</button>
+                <button data-speed="60">60×</button>
+                <button data-speed="300">5min</button>
+            </div>
+        </div>
+
+        <div class="stats">
+            <div class="stat-box tram">
+                <div class="value" id="tramCount">0</div>
+                <div class="label">Trams</div>
+            </div>
+            <div class="stat-box bus">
+                <div class="value" id="busCount">0</div>
+                <div class="label">Buses</div>
+            </div>
+            <div class="stat-box train">
+                <div class="value" id="trainCount">0</div>
+                <div class="label">Trains</div>
+            </div>
+            <div class="stat-box">
+                <div class="value" id="stopCount">0</div>
+                <div class="label">Stops</div>
+            </div>
+        </div>
+
+        <div class="route-legend">
+            <h3>Transit Lines</h3>
+            <div class="legend-items" id="legendItems">
+                <div class="legend-item active" data-type="tram">
+                    <span class="color" style="background: #e91e63;"></span>
+                    Tram
+                </div>
+                <div class="legend-item active" data-type="bus">
+                    <span class="color" style="background: #2196f3;"></span>
+                    Bus
+                </div>
+                <div class="legend-item active" data-type="train">
+                    <span class="color" style="background: #ff9800;"></span>
+                    Train
+                </div>
+            </div>
+        </div>
+
+        <div class="view-controls">
+            <h3>View</h3>
+            <div class="view-buttons">
+                <button id="view3d" class="active">3D</button>
+                <button id="view2d">2D</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="info-panel">
+        Powered by <a href="https://rrm.transitloop.net/" target="_blank">OpenTripPlanner</a> • 
+        Data: RRM Rabat-Salé-Témara
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
