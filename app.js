@@ -783,7 +783,7 @@ function initMap(token) {
         maxPitch: 75,
         fadeDuration: 0,
         renderWorldCopies: false,
-        dragRotate: false,
+        dragRotate: true,
         pitchWithRotate: true,
         touchPitch: true,
         touchZoomRotate: true,
@@ -795,8 +795,9 @@ function initMap(token) {
 
     map.addControl(new mapboxgl.NavigationControl({ showCompass: true, visualizePitch: true }), 'top-right');
 
-    map.dragRotate.disable();
+    map.dragRotate.enable();
     map.touchPitch.enable();
+    map.touchZoomRotate.enable();
     map.touchZoomRotate.enableRotation();
     map.keyboard.enable();
     map.getCanvas().addEventListener('contextmenu', (event) => event.preventDefault());
@@ -1488,52 +1489,6 @@ function updateStats() {
     updateVehiclePositions();
 }
 
-function setupCameraOrbit() {
-    const canvas = map.getCanvas();
-    let orbiting = false;
-    let lastX = 0;
-    let lastY = 0;
-
-    const shouldOrbit = (event) => (
-        event.button === 1 ||
-        event.button === 2 ||
-        event.altKey ||
-        event.ctrlKey ||
-        event.metaKey
-    );
-
-    canvas.addEventListener('contextmenu', (event) => event.preventDefault());
-
-    canvas.addEventListener('mousedown', (event) => {
-        if (!shouldOrbit(event)) return;
-        orbiting = true;
-        lastX = event.clientX;
-        lastY = event.clientY;
-        map.dragPan.disable();
-        canvas.style.cursor = 'grabbing';
-        event.preventDefault();
-    });
-
-    window.addEventListener('mousemove', (event) => {
-        if (!orbiting) return;
-        const dx = event.clientX - lastX;
-        const dy = event.clientY - lastY;
-        lastX = event.clientX;
-        lastY = event.clientY;
-        map.jumpTo({
-            bearing: map.getBearing() - dx * 0.45,
-            pitch: Math.max(0, Math.min(map.getMaxPitch(), map.getPitch() - dy * 0.28))
-        });
-    });
-
-    window.addEventListener('mouseup', () => {
-        if (!orbiting) return;
-        orbiting = false;
-        map.dragPan.enable();
-        canvas.style.cursor = '';
-    });
-}
-
 function setupInteractions() {
     if (interactionsReady) return;
     interactionsReady = true;
@@ -1541,8 +1496,6 @@ function setupInteractions() {
     map.on('moveend', () => {
         if (vehicles.length) updateVehiclePositions();
     });
-
-    setupCameraOrbit();
 
     const showVehiclePopup = (e) => {
         const props = e.features[0].properties;
